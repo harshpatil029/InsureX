@@ -1,0 +1,54 @@
+package com.insurance.management.service.payment.impl;
+
+import com.insurance.management.dto.request.payment.PaymentRequestDTO;
+import com.insurance.management.dto.response.payment.PaymentResponseDTO;
+import com.insurance.management.entity.CustomerPolicy;
+import com.insurance.management.entity.Payment;
+import com.insurance.management.exception.ResourceNotFoundException;
+import com.insurance.management.repository.CustomerPolicyRepository;
+import com.insurance.management.repository.PaymentRepository;
+import com.insurance.management.service.payment.PaymentService;
+import lombok.RequiredArgsConstructor;
+import org.modelmapper.ModelMapper;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Service
+@Transactional
+@RequiredArgsConstructor
+public class PaymentServiceImpl implements PaymentService {
+
+    private final PaymentRepository paymentRepository;
+    private final CustomerPolicyRepository customerPolicyRepository;
+    private final ModelMapper modelMapper;
+
+    @Override
+    public PaymentResponseDTO processPayment(PaymentRequestDTO request) {
+        CustomerPolicy enrollment = customerPolicyRepository.findById(request.getCustomerPolicyId())
+                .orElseThrow(() -> new ResourceNotFoundException("Enrollment not found"));
+
+        Payment payment = modelMapper.map(request, Payment.class);
+        payment.setCustomerPolicy(enrollment);
+        payment.setPaymentDate(LocalDateTime.now());
+        payment.setStatus(Payment.PaymentStatus.SUCCESS); // Simulating success
+
+        if (request.getTransactionId() == null || request.getTransactionId().isEmpty()) {
+            payment.setTransactionId(UUID.randomUUID().toString());
+        }
+
+        Payment savedPayment = paymentRepository.save(payment);
+        return modelMapper.map(savedPayment, PaymentResponseDTO.class);
+    }
+
+    @Override
+    public List<PaymentResponseDTO> getPaymentsByEnrollment(Long enrollmentId) {
+        return paymentRepository.findByCustomerPolicyId(enrollmentId).stream()
+                .map(payment -> modelMapper.map(payment, PaymentResponseDTO.class))
+                .collect(Collectors.toList());
+    }
+}
