@@ -1,0 +1,7 @@
+{
+    "policyName": "Test Policy",
+    "policyDescription": "Description",
+    "coverageAmount": 10000,
+    "premiumAmount": 500,
+    "durationInMonths": 12
+}

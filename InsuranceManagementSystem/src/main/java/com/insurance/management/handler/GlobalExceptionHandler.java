@@ -1,8 +1,9 @@
 package com.insurance.management.handler;
 
-import com.insurance.management.dto.ApiResponse;
-import com.insurance.management.exception.ApiException;
-import com.insurance.management.exception.ResourceNotFoundException;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.AuthenticationException;
@@ -12,15 +13,22 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+import com.insurance.management.dto.ApiResponse;
+import com.insurance.management.exception.ApiException;
+import com.insurance.management.exception.ResourceNotFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<?> handleAccessDeniedException(org.springframework.security.access.AccessDeniedException e) {
+        System.out.println("LOG: Access Denied - " + e.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ApiResponse("Failed", "You do not have permission to perform this action."));
+    }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleException(Exception e) {
+        e.printStackTrace(); // LOG THE ERROR
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ApiResponse("Failed", e.getMessage()));
     }

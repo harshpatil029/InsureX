@@ -1,176 +1,245 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Container, Row, Col, Card, Form, Button } from 'react-bootstrap';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { motion } from 'framer-motion';
-import { Lock, Mail, Loader2, User, Phone, ShieldCheck } from 'lucide-react';
+import ErrorAlert from '../components/ErrorAlert';
+import SuccessAlert from '../components/SuccessAlert';
 
 const Register = () => {
     const [formData, setFormData] = useState({
         username: '',
         email: '',
         password: '',
-        roles: ['CUSTOMER']
+        confirmPassword: '',
+        fullName: '',
+        role: 'ROLE_CUSTOMER',
     });
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+    const [errors, setErrors] = useState({});
+    const [errorMessage, setErrorMessage] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
+    const [loading, setLoading] = useState(false);
+
     const { register } = useAuth();
     const navigate = useNavigate();
 
+    const validateForm = () => {
+        const newErrors = {};
+
+        if (!formData.username.trim()) {
+            newErrors.username = 'Username is required';
+        } else if (formData.username.length < 3) {
+            newErrors.username = 'Username must be at least 3 characters';
+        }
+
+        if (!formData.email.trim()) {
+            newErrors.email = 'Email is required';
+        } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+            newErrors.email = 'Email is invalid';
+        }
+
+        if (!formData.fullName.trim()) {
+            newErrors.fullName = 'Full name is required';
+        }
+
+        if (!formData.password) {
+            newErrors.password = 'Password is required';
+        } else if (formData.password.length < 6) {
+            newErrors.password = 'Password must be at least 6 characters';
+        }
+
+        if (!formData.confirmPassword) {
+            newErrors.confirmPassword = 'Please confirm your password';
+        } else if (formData.password !== formData.confirmPassword) {
+            newErrors.confirmPassword = 'Passwords do not match';
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        setFormData({ ...formData, [name]: value });
+        // Clear error for this field
+        if (errors[name]) {
+            setErrors({ ...errors, [name]: '' });
+        }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setIsLoading(true);
-        setError('');
-        setSuccess('');
+        setErrorMessage('');
+        setSuccessMessage('');
 
-        try {
-            const message = await register(formData);
-            setSuccess(message + ' Redirecting to login...');
-            setTimeout(() => navigate('/login'), 2000);
-        } catch (err) {
-            setError(err);
-        } finally {
-            setIsLoading(false);
+        if (!validateForm()) {
+            return;
+        }
+
+        setLoading(true);
+
+        // Prepare data for API - transform to match backend RegisterRequestDTO
+        const { confirmPassword, fullName, role, ...rest } = formData;
+        const registrationData = {
+            ...rest,
+            roles: [role] // Backend expects roles as array
+        };
+
+        const result = await register(registrationData);
+
+        setLoading(false);
+
+        if (result.success) {
+            setSuccessMessage(result.message);
+            setTimeout(() => {
+                navigate('/login');
+            }, 2000);
+        } else {
+            setErrorMessage(result.message);
         }
     };
 
     return (
-        <div className="min-h-screen w-full flex items-center justify-center bg-[#0f172a] p-4">
-            {/* Background Decorative Elements */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-primary-600/10 blur-[100px] rounded-full" />
-                <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-blue-600/10 blur-[100px] rounded-full" />
-            </div>
+        <Container className="mt-5">
+            <Row className="justify-content-center">
+                <Col md={8} lg={6}>
+                    <Card className="shadow">
+                        <Card.Body className="p-4">
+                            <h2 className="text-center mb-4">Create Account</h2>
 
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="max-w-md w-full relative z-10"
-            >
-                <div className="bg-slate-800/50 backdrop-blur-xl p-8 rounded-3xl border border-white/10 shadow-2xl">
-                    <div className="text-center mb-10">
-                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-500/20 mb-4 border border-primary-500/20">
-                            <ShieldCheck className="w-8 h-8 text-primary-400" />
-                        </div>
-                        <h1 className="text-3xl font-bold text-white mb-2">Join InsureX</h1>
-                        <p className="text-slate-400">Create your account to get started</p>
-                    </div>
+                            <ErrorAlert
+                                message={errorMessage}
+                                onClose={() => setErrorMessage('')}
+                            />
 
-                    {error && (
-                        <motion.div
-                            initial={{ scale: 0.95 }}
-                            animate={{ scale: 1 }}
-                            className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm"
-                        >
-                            {error.toString()}
-                        </motion.div>
-                    )}
+                            <SuccessAlert
+                                message={successMessage}
+                                onClose={() => setSuccessMessage('')}
+                            />
 
-                    {success && (
-                        <motion.div
-                            initial={{ scale: 0.95 }}
-                            animate={{ scale: 1 }}
-                            className="mb-6 p-4 bg-green-500/10 border border-green-500/20 rounded-xl text-green-400 text-sm"
-                        >
-                            {success}
-                        </motion.div>
-                    )}
+                            <Form onSubmit={handleSubmit}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Full Name</Form.Label>
+                                    <Form.Control
+                                        type="text"
+                                        name="fullName"
+                                        value={formData.fullName}
+                                        onChange={handleChange}
+                                        isInvalid={!!errors.fullName}
+                                        placeholder="Enter your full name"
+                                        disabled={loading}
+                                    />
+                                    <Form.Control.Feedback type="invalid">
+                                        {errors.fullName}
+                                    </Form.Control.Feedback>
+                                </Form.Group>
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-300 ml-1">Username</label>
-                            <div className="relative group">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                    <User className="h-5 w-5 text-slate-500 group-focus-within:text-primary-400 transition-colors" />
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Username</Form.Label>
+                                    <Form.Control
+                                        type="text"
+                                        name="username"
+                                        value={formData.username}
+                                        onChange={handleChange}
+                                        isInvalid={!!errors.username}
+                                        placeholder="Choose a username"
+                                        disabled={loading}
+                                    />
+                                    <Form.Control.Feedback type="invalid">
+                                        {errors.username}
+                                    </Form.Control.Feedback>
+                                </Form.Group>
+
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Email</Form.Label>
+                                    <Form.Control
+                                        type="email"
+                                        name="email"
+                                        value={formData.email}
+                                        onChange={handleChange}
+                                        isInvalid={!!errors.email}
+                                        placeholder="Enter your email"
+                                        disabled={loading}
+                                    />
+                                    <Form.Control.Feedback type="invalid">
+                                        {errors.email}
+                                    </Form.Control.Feedback>
+                                </Form.Group>
+
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Password</Form.Label>
+                                    <Form.Control
+                                        type="password"
+                                        name="password"
+                                        value={formData.password}
+                                        onChange={handleChange}
+                                        isInvalid={!!errors.password}
+                                        placeholder="Create a password"
+                                        disabled={loading}
+                                    />
+                                    <Form.Control.Feedback type="invalid">
+                                        {errors.password}
+                                    </Form.Control.Feedback>
+                                </Form.Group>
+
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Confirm Password</Form.Label>
+                                    <Form.Control
+                                        type="password"
+                                        name="confirmPassword"
+                                        value={formData.confirmPassword}
+                                        onChange={handleChange}
+                                        isInvalid={!!errors.confirmPassword}
+                                        placeholder="Confirm your password"
+                                        disabled={loading}
+                                    />
+                                    <Form.Control.Feedback type="invalid">
+                                        {errors.confirmPassword}
+                                    </Form.Control.Feedback>
+                                </Form.Group>
+
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Role</Form.Label>
+                                    <Form.Select
+                                        name="role"
+                                        value={formData.role}
+                                        onChange={handleChange}
+                                        disabled={loading}
+                                    >
+                                        <option value="ROLE_CUSTOMER">Customer</option>
+                                        <option value="ROLE_AGENT">Agent</option>
+                                    </Form.Select>
+                                    <Form.Text className="text-muted">
+                                        Note: Admin accounts can only be created by existing administrators.
+                                    </Form.Text>
+                                </Form.Group>
+
+                                <Button
+                                    variant="primary"
+                                    type="submit"
+                                    className="w-100 mb-3"
+                                    disabled={loading}
+                                >
+                                    {loading ? (
+                                        <>
+                                            <span className="spinner-border spinner-border-sm me-2" />
+                                            Creating Account...
+                                        </>
+                                    ) : (
+                                        'Register'
+                                    )}
+                                </Button>
+
+                                <div className="text-center">
+                                    <p className="mb-0">
+                                        Already have an account? <Link to="/login">Login here</Link>
+                                    </p>
                                 </div>
-                                <input
-                                    name="username"
-                                    type="text"
-                                    required
-                                    className="block w-full pl-11 pr-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all"
-                                    placeholder="johndoe"
-                                    value={formData.username}
-                                    onChange={handleChange}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-300 ml-1">Email Address</label>
-                            <div className="relative group">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                    <Mail className="h-5 w-5 text-slate-500 group-focus-within:text-primary-400 transition-colors" />
-                                </div>
-                                <input
-                                    name="email"
-                                    type="email"
-                                    required
-                                    className="block w-full pl-11 pr-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all"
-                                    placeholder="name@company.com"
-                                    value={formData.email}
-                                    onChange={handleChange}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-300 ml-1">Password</label>
-                            <div className="relative group">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                    <Lock className="h-5 w-5 text-slate-500 group-focus-within:text-primary-400 transition-colors" />
-                                </div>
-                                <input
-                                    name="password"
-                                    type="password"
-                                    required
-                                    className="block w-full pl-11 pr-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all"
-                                    placeholder="••••••••"
-                                    value={formData.password}
-                                    onChange={handleChange}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-300 ml-1">I am a...</label>
-                            <select
-                                name="roles"
-                                value={formData.roles[0]}
-                                onChange={(e) => setFormData({ ...formData, roles: [e.target.value] })}
-                                className="block w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all appearance-none cursor-pointer"
-                            >
-                                <option value="CUSTOMER">Customer</option>
-                                <option value="AGENT">Agent</option>
-                                <option value="ADMIN">Administrator</option>
-                            </select>
-                        </div>
-
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="w-full py-4 px-6 bg-gradient-to-r from-primary-600 to-blue-600 hover:from-primary-500 hover:to-blue-500 text-white font-semibold rounded-xl shadow-lg shadow-primary-500/20 transform transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-4"
-                        >
-                            {isLoading ? (
-                                <Loader2 className="w-5 h-5 animate-spin" />
-                            ) : (
-                                'Create Account'
-                            )}
-                        </button>
-                    </form>
-
-                    <p className="mt-8 text-center text-slate-400 text-sm">
-                        Already have an account?{' '}
-                        <Link to="/login" className="text-primary-400 hover:text-primary-300 font-medium transition-colors">
-                            Sign In
-                        </Link>
-                    </p>
-                </div>
-            </motion.div>
-        </div>
+                            </Form>
+                        </Card.Body>
+                    </Card>
+                </Col>
+            </Row>
+        </Container>
     );
 };
 

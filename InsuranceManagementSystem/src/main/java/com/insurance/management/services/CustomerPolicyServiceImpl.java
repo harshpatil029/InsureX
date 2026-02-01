@@ -44,7 +44,7 @@ public class CustomerPolicyServiceImpl implements CustomerPolicyService {
 
     @Override
     public List<CustomerPolicy> getPoliciesByCustomer(Long customerId) {
-        return customerPolicyRepository.findByCustomerId(customerId);
+        return customerPolicyRepository.findByCustomer_Id(customerId);
     }
 
     @Override

@@ -18,4 +18,6 @@ public interface CustomerService {
     List<CustomerResponseDTO> getAllCustomers();
 
     void deleteCustomer(Long id);
+
+    void deactivateCustomer(Long id);
 }

@@ -28,7 +28,7 @@ public class CustomerPolicyController {
     }
 
     @PatchMapping("/{id}/status")
-    @org.springframework.security.access.prepost.PreAuthorize("hasRole('ADMIN')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'AGENT')")
     public ResponseEntity<CustomerPolicy> updateStatus(@PathVariable Long id,
             @RequestParam CustomerPolicy.PolicyStatus status) {
         return ResponseEntity.ok(customerPolicyService.updateStatus(id, status));

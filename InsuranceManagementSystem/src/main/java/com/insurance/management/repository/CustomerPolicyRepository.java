@@ -5,5 +5,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface CustomerPolicyRepository extends JpaRepository<CustomerPolicy, Long> {
-    List<CustomerPolicy> findByCustomerId(Long customerId);
+    List<CustomerPolicy> findByCustomer_Id(Long customerId);
 }

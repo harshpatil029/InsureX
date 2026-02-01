@@ -1,28 +1,27 @@
 package com.insurance.management.services;
 
+import java.util.stream.Collectors;
+
+import org.modelmapper.ModelMapper;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.insurance.management.dto.AuthResponseDTO;
 import com.insurance.management.dto.LoginRequestDTO;
 import com.insurance.management.dto.RegisterRequestDTO;
-import com.insurance.management.dto.AuthResponseDTO;
-import com.insurance.management.entity.User;
 import com.insurance.management.entity.Customer;
+import com.insurance.management.entity.User;
 import com.insurance.management.entity.UserRole;
 import com.insurance.management.repository.CustomerRepository;
 import com.insurance.management.repository.UserRepository;
 import com.insurance.management.security.JwtUtils;
 import com.insurance.management.security.UserPrincipal;
-import com.insurance.management.services.AuthService;
-import lombok.RequiredArgsConstructor;
-import org.modelmapper.ModelMapper;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @Transactional
@@ -42,11 +41,10 @@ public class AuthServiceImpl implements AuthService {
                 new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
 
         UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
-        System.out.println(principal);
         String token = jwtUtils.generateToken(principal);
 
         return new AuthResponseDTO(
-                Long.valueOf(principal.getId()),
+                Long.valueOf(principal.getUserId()),
                 token,
                 principal.getEmail(),
                 principal.getAuthorities().stream()

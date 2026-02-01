@@ -1,215 +1,252 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, CheckCircle, Clock, XCircle, Search, Loader2, FileText, DollarSign } from 'lucide-react';
-import Modal from '../components/Modal';
+import { Container, Row, Col, Card, Table, Button, Badge, Dropdown, ButtonGroup, Modal } from 'react-bootstrap';
+import { claimAPI } from '../services/apiService';
 import { useAuth } from '../context/AuthContext';
-import axios from '../api/axios';
+import LoadingSpinner from '../components/LoadingSpinner';
+import ErrorAlert from '../components/ErrorAlert';
+import SuccessAlert from '../components/SuccessAlert';
+import { formatCurrency, formatDate } from '../utils/helpers';
 
 const Claims = () => {
-    const { user } = useAuth();
+    const { hasRole } = useAuth();
     const [claims, setClaims] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [policies, setPolicies] = useState([]); // Customer's policies
-    const [formData, setFormData] = useState({
-        customerPolicyId: '',
-        claimAmount: '',
-        description: ''
-    });
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+    const [filter, setFilter] = useState('ALL');
+    const [showDetailModal, setShowDetailModal] = useState(false);
+    const [selectedClaim, setSelectedClaim] = useState(null);
 
     useEffect(() => {
         fetchClaims();
-        if (user?.role === 'ROLE_CUSTOMER') {
-            fetchUserPolicies();
-        }
-    }, [user]);
-
-    const fetchUserPolicies = async () => {
-        try {
-            const custRes = await axios.get(`/customers/user/${user.id}`);
-            const customerId = custRes.data.id;
-            const polRes = await axios.get(`/enrollments/customer/${customerId}`);
-            setPolicies(polRes.data);
-        } catch (error) {
-            console.error('Error fetching policies for claims:', error);
-        }
-    };
+    }, []);
 
     const fetchClaims = async () => {
+        setLoading(true);
+        setError('');
         try {
-            const response = await axios.get('/claims');
-            setClaims(response.data);
-        } catch (error) {
-            console.error('Error fetching claims:', error);
+            const data = await claimAPI.getAll();
+            setClaims(data);
+        } catch (err) {
+            console.error('Error fetching claims:', err);
+            setError('Failed to load claims database.');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const handleStatusUpdate = async (claimId, newStatus) => {
         try {
-            await axios.post('/claims', formData);
+            await claimAPI.updateStatus(claimId, newStatus);
+            setSuccess(`Claim #${claimId} marked as ${newStatus.toLowerCase()}.`);
+            setShowDetailModal(false);
             fetchClaims();
-            closeModal();
-        } catch (error) {
-            console.error('Error filing claim:', error);
+        } catch (err) {
+            console.error('Error updating claim:', err);
+            let detailedMsg = err.response?.data?.message || err.response?.data?.error || 'Update failed.';
+            // Add full details for debugging 500s
+            if (err.response?.data && typeof err.response.data === 'object') {
+                detailedMsg += ` (${JSON.stringify(err.response.data)})`;
+            }
+            if (detailedMsg.includes('Access Denied')) {
+                detailedMsg = 'Permission Error: You updated the permissions code, but the Backend Server is still running the old version. Please RESTART the Backend Server to apply changes.';
+            }
+            setError(detailedMsg);
         }
     };
 
-    const handleStatusUpdate = async (id, status) => {
-        try {
-            await axios.patch(`/claims/${id}/status`, null, { params: { status } });
-            fetchClaims();
-        } catch (error) {
-            console.error('Error updating claim status:', error);
-        }
+    const handleShowDetail = (claim) => {
+        setSelectedClaim(claim);
+        setShowDetailModal(true);
     };
 
-    const closeModal = () => {
-        setIsModalOpen(false);
-        setFormData({ customerPolicyId: '', claimAmount: '', description: '' });
+    const getStatusBadge = (status) => {
+        const variants = {
+            PENDING: 'warning',
+            APPROVED: 'success',
+            REJECTED: 'danger',
+        };
+        return (
+            <Badge bg={variants[status] || 'secondary'} className="px-3 py-2 rounded-pill fw-normal">
+                {status}
+            </Badge>
+        );
     };
 
-    const getStatusStyle = (status) => {
-        switch (status) {
-            case 'APPROVED': return 'bg-green-500/10 text-green-500 border-green-500/20';
-            case 'REJECTED': return 'bg-red-500/10 text-red-500 border-red-500/20';
-            default: return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
-        }
-    };
+    const filteredClaims = filter === 'ALL' ? claims : claims.filter(c => c.status === filter);
+
+    if (loading) return <LoadingSpinner />;
 
     return (
-        <div className="max-w-6xl mx-auto py-8">
-            <div className="flex justify-between items-center mb-8 bg-slate-800/20 p-6 rounded-2xl border border-white/5">
-                <div>
-                    <h1 className="text-3xl font-bold text-white">Claims History</h1>
-                    <p className="text-slate-400 mt-1">
-                        {user?.role === 'ROLE_ADMIN' ? 'Review and process all system claims' : 'Track and manage your insurance claims'}
-                    </p>
-                </div>
-                {user?.role === 'ROLE_CUSTOMER' && (
-                    <button
-                        onClick={() => setIsModalOpen(true)}
-                        className="bg-primary-600 hover:bg-primary-500 text-white px-6 py-3 rounded-xl font-semibold flex items-center gap-2 transition-all shadow-lg shadow-primary-600/20"
-                    >
-                        <Plus className="w-5 h-5" /> File New Claim
-                    </button>
-                )}
-            </div>
+        <Container className="mt-4 pb-5">
+            <Row className="mb-4 align-items-center">
+                <Col>
+                    <h2 className="d-flex align-items-center">
+                        <i className="bi bi-clipboard-pulse text-primary me-2"></i>
+                        Claims Approval Center
+                    </h2>
+                    <p className="text-muted mb-0">Review and decision insurance benefit requests</p>
+                </Col>
+                <Col className="text-end d-flex justify-content-end gap-2">
+                    <Dropdown as={ButtonGroup} onSelect={(k) => setFilter(k)}>
+                        <Button variant="outline-primary" size="sm">
+                            <i className="bi bi-funnel me-1"></i> Filter: {filter}
+                        </Button>
+                        <Dropdown.Toggle split variant="outline-primary" size="sm" />
+                        <Dropdown.Menu align="end">
+                            <Dropdown.Item eventKey="ALL">Show All</Dropdown.Item>
+                            <Dropdown.Item eventKey="PENDING">Pending Only</Dropdown.Item>
+                            <Dropdown.Item eventKey="APPROVED">Approved Only</Dropdown.Item>
+                            <Dropdown.Item eventKey="REJECTED">Rejected Only</Dropdown.Item>
+                        </Dropdown.Menu>
+                    </Dropdown>
+                    <Button variant="outline-secondary" size="sm" onClick={fetchClaims}>
+                        <i className="bi bi-arrow-clockwise"></i>
+                    </Button>
+                </Col>
+            </Row>
 
-            {loading ? (
-                <div className="flex justify-center py-20">
-                    <Loader2 className="w-12 h-12 text-primary-500 animate-spin" />
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 gap-4">
-                    {claims.map((claim) => (
-                        <div key={claim.id} className="bg-slate-800/40 border border-slate-700/50 rounded-2xl p-6 hover:border-primary-500/30 transition-all">
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                                <div className="flex gap-4 items-start">
-                                    <div className="w-12 h-12 rounded-xl bg-slate-700 flex items-center justify-center text-primary-400">
-                                        <FileText className="w-6 h-6" />
-                                    </div>
-                                    <div>
-                                        <div className="flex items-center gap-3 mb-1">
-                                            <h3 className="text-lg font-bold text-white">Claim #{claim.id}</h3>
-                                            <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getStatusStyle(claim.status)}`}>
-                                                {claim.status}
-                                            </span>
-                                        </div>
-                                        <p className="text-slate-400 text-sm mb-2">{claim.description}</p>
-                                        <div className="flex gap-4 text-xs text-slate-500">
-                                            <span>Policy ID: {claim.customerPolicyId}</span>
-                                            <span>Date: {claim.claimDate}</span>
-                                        </div>
-                                    </div>
-                                </div>
+            {/* Alerts removed as per request */}
 
-                                <div className="flex flex-col items-end gap-3 min-w-[150px]">
-                                    <p className="text-2xl font-bold text-white">${claim.claimAmount}</p>
-                                    <div className="flex gap-2">
-                                        {user?.role === 'ROLE_ADMIN' && claim.status === 'PENDING' && (
-                                            <>
-                                                <button
-                                                    onClick={() => handleStatusUpdate(claim.id, 'APPROVED')}
-                                                    className="p-2 bg-green-500/10 hover:bg-green-500/20 rounded-lg text-green-500 transition-colors"
-                                                    title="Approve"
-                                                >
-                                                    <CheckCircle className="w-5 h-5" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleStatusUpdate(claim.id, 'REJECTED')}
-                                                    className="p-2 bg-red-500/10 hover:bg-red-500/20 rounded-lg text-red-500 transition-colors"
-                                                    title="Reject"
-                                                >
-                                                    <XCircle className="w-5 h-5" />
-                                                </button>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
+            {/* Admin/Agent Stats */}
+            <Row className="mb-4">
+                <Col md={3}>
+                    <Card className="shadow-sm border-0 border-top border-warning border-4 h-100">
+                        <Card.Body>
+                            <h6 className="text-muted small mb-1">Awaiting Review</h6>
+                            <h3 className="mb-0 text-warning">{claims.filter(c => c.status === 'PENDING').length}</h3>
+                        </Card.Body>
+                    </Card>
+                </Col>
+                <Col md={3}>
+                    <Card className="shadow-sm border-0 border-top border-success border-4 h-100">
+                        <Card.Body>
+                            <h6 className="text-muted small mb-1">Approved Claims</h6>
+                            <h3 className="mb-0 text-success">{claims.filter(c => c.status === 'APPROVED').length}</h3>
+                        </Card.Body>
+                    </Card>
+                </Col>
+                <Col md={6}>
+                    <Card className="shadow-sm border-0 border-top border-primary border-4 h-100 bg-light">
+                        <Card.Body className="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 className="text-muted small mb-1 text-uppercase">Total Exposure (Approved)</h6>
+                                <h3 className="mb-0 text-primary">
+                                    {formatCurrency(claims.filter(c => c.status === 'APPROVED').reduce((sum, c) => sum + (c.claimAmount || 0), 0))}
+                                </h3>
                             </div>
+                            <i className="bi bi-bank fs-1 text-primary opacity-25"></i>
+                        </Card.Body>
+                    </Card>
+                </Col>
+            </Row>
+
+            <Card className="shadow-sm border-0">
+                <Card.Body className="p-0">
+                    {filteredClaims.length === 0 ? (
+                        <div className="text-center py-5">
+                            <i className="bi bi-journal-check text-muted mb-3" style={{ fontSize: '3rem' }}></i>
+                            <h5 className="text-muted">Queue is clear!</h5>
+                            <p className="small text-muted mb-0">No claims matching your filter were found.</p>
                         </div>
-                    ))}
-                    {claims.length === 0 && (
-                        <div className="py-20 text-center text-slate-500 bg-slate-800/20 rounded-3xl border border-dashed border-slate-700">
-                            No claims filed yet.
+                    ) : (
+                        <Table responsive hover className="mb-0">
+                            <thead className="bg-light">
+                                <tr className="small text-muted">
+                                    <th className="ps-4 py-3">Claim Reference</th>
+
+                                    <th className="py-3">Amount</th>
+                                    <th className="py-3">Submission Date</th>
+                                    <th className="py-3">Current Status</th>
+                                    <th className="py-3 pe-4 text-end">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredClaims.map((claim) => (
+                                    <tr key={claim.id} className="align-middle">
+                                        <td className="ps-4">
+                                            <span className="fw-bold">CLM-{claim.id}</span>
+                                        </td>
+
+                                        <td>
+                                            <span className="fw-bold fs-6">{formatCurrency(claim.claimAmount)}</span>
+                                        </td>
+                                        <td>{formatDate(claim.claimDate)}</td>
+                                        <td>{getStatusBadge(claim.status)}</td>
+                                        <td className="pe-4 text-end">
+                                            <Button
+                                                variant="light"
+                                                size="sm"
+                                                className="border text-primary fw-bold"
+                                                onClick={() => handleShowDetail(claim)}
+                                            >
+                                                Review
+                                            </Button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </Table>
+                    )}
+                </Card.Body>
+            </Card>
+
+            {/* Claim Review Modal */}
+            <Modal show={showDetailModal} onHide={() => setShowDetailModal(false)} centered size="md">
+                <Modal.Header closeButton className="border-0">
+                    <Modal.Title className="fw-bold">Review Claim Reference CLM-{selectedClaim?.id}</Modal.Title>
+                </Modal.Header>
+                <Modal.Body className="pt-0">
+                    {selectedClaim && (
+                        <div className="bg-light p-4 rounded mb-4">
+
+                            <Row className="mb-3">
+                                <Col xs={6} className="text-muted small">Incident Date:</Col>
+                                <Col xs={6} className="text-end fw-bold">{formatDate(selectedClaim.claimDate)}</Col>
+                            </Row>
+                            <Row className="mb-3">
+                                <Col xs={6} className="text-muted small">Requested Benefit:</Col>
+                                <Col xs={6} className="text-end fw-bold text-dark fs-5">{formatCurrency(selectedClaim.claimAmount)}</Col>
+                            </Row>
+                            <hr />
+                            <div className="small text-muted mb-2">Internal Note:</div>
+                            <p className="text-dark small mb-0">
+                                This claim was submitted via the customer portal. Please verify the enrollment status and mandatory cooling-off periods before approval.
+                            </p>
                         </div>
                     )}
-                </div>
-            )}
 
-            <Modal
-                isOpen={isModalOpen}
-                onClose={closeModal}
-                title="File New Claim"
-            >
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1">Select Enrolled Policy</label>
-                        <select
-                            required
-                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary-500"
-                            value={formData.customerPolicyId}
-                            onChange={(e) => setFormData({ ...formData, customerPolicyId: e.target.value })}
-                        >
-                            <option value="">Choose a policy...</option>
-                            {policies.map(p => (
-                                <option key={p.id} value={p.id}>{p.policy.policyName} (#{p.id})</option>
-                            ))}
-                        </select>
+                    <div className="text-center text-muted extra-small mb-4">
+                        <i className="bi bi-info-circle-fill me-1"></i>
+                        Final decisions are recorded for audit purposes and cannot be reversed easily.
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1">Claim Amount ($)</label>
-                        <input
-                            required
-                            type="number"
-                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary-500"
-                            placeholder="0.00"
-                            value={formData.claimAmount}
-                            onChange={(e) => setFormData({ ...formData, claimAmount: e.target.value })}
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-1">Description</label>
-                        <textarea
-                            required
-                            rows="4"
-                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary-500 resize-none"
-                            placeholder="Describe the incident..."
-                            value={formData.description}
-                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        />
-                    </div>
-                    <button
-                        type="submit"
-                        className="w-full py-4 bg-primary-600 hover:bg-primary-500 text-white font-bold rounded-xl mt-4 transition-all"
-                    >
-                        Submit Claim Request
-                    </button>
-                </form>
+                </Modal.Body>
+                <Modal.Footer className="border-0 justify-content-center pb-4">
+                    {selectedClaim?.status === 'PENDING' ? (
+                        <>
+                            <Button
+                                variant="outline-danger"
+                                className="px-4 rounded-pill"
+                                onClick={() => handleStatusUpdate(selectedClaim.id, 'REJECTED')}
+                            >
+                                <i className="bi bi-x-lg me-1"></i> Decline
+                            </Button>
+                            <Button
+                                variant="success"
+                                className="px-4 rounded-pill shadow-sm"
+                                onClick={() => handleStatusUpdate(selectedClaim.id, 'APPROVED')}
+                            >
+                                <i className="bi bi-check-lg me-1"></i> Approve Benefit
+                            </Button>
+                        </>
+                    ) : (
+                        <Button variant="secondary" onClick={() => setShowDetailModal(false)} className="rounded-pill px-4">
+                            Close Review
+                        </Button>
+                    )}
+                </Modal.Footer>
             </Modal>
-        </div>
+        </Container>
     );
 };
 

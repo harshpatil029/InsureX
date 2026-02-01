@@ -1,126 +1,145 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Container, Row, Col, Card, Form, Button } from 'react-bootstrap';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { motion } from 'framer-motion';
-import { Lock, Mail, Loader2, ShieldCheck } from 'lucide-react';
+import ErrorAlert from '../components/ErrorAlert';
 
 const Login = () => {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+    const [formData, setFormData] = useState({
+        username: '',
+        password: '',
+    });
+    const [errors, setErrors] = useState({});
+    const [errorMessage, setErrorMessage] = useState('');
+    const [loading, setLoading] = useState(false);
+
     const { login } = useAuth();
     const navigate = useNavigate();
 
+    const validateForm = () => {
+        const newErrors = {};
+
+        if (!formData.username.trim()) {
+            newErrors.username = 'Username is required';
+        }
+
+        if (!formData.password) {
+            newErrors.password = 'Password is required';
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData({ ...formData, [name]: value });
+        // Clear error for this field
+        if (errors[name]) {
+            setErrors({ ...errors, [name]: '' });
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setIsLoading(true);
-        setError('');
+        setErrorMessage('');
 
-        try {
-            const user = await login(email, password);
+        if (!validateForm()) {
+            return;
+        }
 
-            // Role-based redirection
-            if (user.role === 'ROLE_ADMIN') navigate('/admin/dashboard');
-            else if (user.role === 'ROLE_AGENT') navigate('/agent/dashboard');
-            else navigate('/customer/dashboard');
+        setLoading(true);
 
-        } catch (err) {
-            setError(err);
-        } finally {
-            setIsLoading(false);
+        const result = await login(formData);
+
+        setLoading(false);
+
+        if (result.success) {
+            navigate('/dashboard');
+        } else {
+            setErrorMessage(result.message);
         }
     };
 
     return (
-        <div className="min-h-screen w-full flex items-center justify-center bg-[#0f172a] p-4">
-            {/* Background Decorative Elements */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-primary-600/10 blur-[100px] rounded-full" />
-                <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-blue-600/10 blur-[100px] rounded-full" />
-            </div>
+        <Container className="mt-5">
+            <Row className="justify-content-center">
+                <Col md={6} lg={5}>
+                    <Card className="shadow">
+                        <Card.Body className="p-4">
+                            <h2 className="text-center mb-4">Login to InsureX</h2>
 
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="max-w-md w-full relative z-10"
-            >
-                <div className="bg-slate-800/50 backdrop-blur-xl p-8 rounded-3xl border border-white/10 shadow-2xl">
-                    <div className="text-center mb-10">
-                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-500/20 mb-4 border border-primary-500/20">
-                            <ShieldCheck className="w-8 h-8 text-primary-400" />
-                        </div>
-                        <h1 className="text-3xl font-bold text-white mb-2">InsureX</h1>
-                        <p className="text-slate-400">Insurance Management System</p>
-                    </div>
+                            <ErrorAlert
+                                message={errorMessage}
+                                onClose={() => setErrorMessage('')}
+                            />
 
-                    {error && (
-                        <motion.div
-                            initial={{ scale: 0.95 }}
-                            animate={{ scale: 1 }}
-                            className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm"
-                        >
-                            {error.toString()}
-                        </motion.div>
-                    )}
+                            <Form onSubmit={handleSubmit}>
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Username</Form.Label>
+                                    <Form.Control
+                                        type="text"
+                                        name="username"
+                                        value={formData.username}
+                                        onChange={handleChange}
+                                        isInvalid={!!errors.username}
+                                        placeholder="Enter username"
+                                        disabled={loading}
+                                    />
+                                    <Form.Control.Feedback type="invalid">
+                                        {errors.username}
+                                    </Form.Control.Feedback>
+                                </Form.Group>
 
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-300 ml-1">Email Address</label>
-                            <div className="relative group">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                    <Mail className="h-5 w-5 text-slate-500 group-focus-within:text-primary-400 transition-colors" />
+                                <Form.Group className="mb-3">
+                                    <Form.Label>Password</Form.Label>
+                                    <Form.Control
+                                        type="password"
+                                        name="password"
+                                        value={formData.password}
+                                        onChange={handleChange}
+                                        isInvalid={!!errors.password}
+                                        placeholder="Enter password"
+                                        disabled={loading}
+                                    />
+                                    <Form.Control.Feedback type="invalid">
+                                        {errors.password}
+                                    </Form.Control.Feedback>
+                                </Form.Group>
+
+                                <div className="text-end mb-3">
+                                    <Link to="/forgot-password" className="text-decoration-none small">
+                                        Forgot Password?
+                                    </Link>
                                 </div>
-                                <input
-                                    type="email"
-                                    required
-                                    className="block w-full pl-11 pr-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all"
-                                    placeholder="name@company.com"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                />
-                            </div>
-                        </div>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-300 ml-1">Password</label>
-                            <div className="relative group">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                    <Lock className="h-5 w-5 text-slate-500 group-focus-within:text-primary-400 transition-colors" />
+                                <Button
+                                    variant="primary"
+                                    type="submit"
+                                    className="w-100 mb-3"
+                                    disabled={loading}
+                                >
+                                    {loading ? (
+                                        <>
+                                            <span className="spinner-border spinner-border-sm me-2" />
+                                            Logging in...
+                                        </>
+                                    ) : (
+                                        'Login'
+                                    )}
+                                </Button>
+
+                                <div className="text-center">
+                                    <p className="mb-0">
+                                        Don't have an account? <Link to="/register">Register here</Link>
+                                    </p>
                                 </div>
-                                <input
-                                    type="password"
-                                    required
-                                    className="block w-full pl-11 pr-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all"
-                                    placeholder="••••••••"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                />
-                            </div>
-                        </div>
-
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="w-full py-4 px-6 bg-gradient-to-r from-primary-600 to-blue-600 hover:from-primary-500 hover:to-blue-500 text-white font-semibold rounded-xl shadow-lg shadow-primary-500/20 transform transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                        >
-                            {isLoading ? (
-                                <Loader2 className="w-5 h-5 animate-spin" />
-                            ) : (
-                                'Sign In'
-                            )}
-                        </button>
-                    </form>
-
-                    <p className="mt-8 text-center text-slate-500 text-sm">
-                        Don't have an account?{' '}
-                        <Link to="/register" className="text-primary-400 hover:text-primary-300 font-medium transition-colors">
-                            Register Now
-                        </Link>
-                    </p>
-                </div>
-            </motion.div>
-        </div>
+                            </Form>
+                        </Card.Body>
+                    </Card>
+                </Col>
+            </Row>
+        </Container>
     );
 };
 

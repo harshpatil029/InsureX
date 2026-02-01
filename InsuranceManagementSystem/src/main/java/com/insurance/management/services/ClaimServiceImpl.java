@@ -42,24 +42,63 @@ public class ClaimServiceImpl implements ClaimService {
 
     @Override
     public ClaimResponseDTO updateClaimStatus(Long claimId, String status) {
-        Claim claim = claimRepository.findById(claimId)
-                .orElseThrow(() -> new ResourceNotFoundException("Claim not found"));
-        claim.setStatus(Claim.ClaimStatus.valueOf(status));
-        Claim updatedClaim = claimRepository.save(claim);
-        return modelMapper.map(updatedClaim, ClaimResponseDTO.class);
+        try {
+            Claim claim = claimRepository.findById(claimId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Claim not found"));
+
+            try {
+                claim.setStatus(Claim.ClaimStatus.valueOf(status.toUpperCase()));
+            } catch (IllegalArgumentException e) {
+                throw new ResourceNotFoundException("Invalid status value: " + status);
+            }
+
+            Claim updatedClaim = claimRepository.saveAndFlush(claim);
+
+            // Manual Mapping to avoid ModelMapper issues/recursion
+            ClaimResponseDTO response = new ClaimResponseDTO();
+            response.setId(updatedClaim.getId());
+            response.setClaimAmount(updatedClaim.getClaimAmount());
+            response.setClaimDate(updatedClaim.getClaimDate());
+            response.setDescription(updatedClaim.getDescription());
+            response.setStatus(updatedClaim.getStatus().name());
+
+            if (updatedClaim.getCustomerPolicy() != null) {
+                response.setCustomerPolicyId(updatedClaim.getCustomerPolicy().getId());
+            } else {
+                response.setCustomerPolicyId(0L);
+            }
+
+            return response;
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Service Error: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+        }
     }
 
     @Override
     public List<ClaimResponseDTO> getClaimsByEnrollment(Long enrollmentId) {
-        return claimRepository.findByCustomerPolicyId(enrollmentId).stream()
-                .map(claim -> modelMapper.map(claim, ClaimResponseDTO.class))
+        return claimRepository.findByCustomerPolicy_Id(enrollmentId).stream()
+                .map(this::mapToDTO)
                 .collect(Collectors.toList());
     }
 
     @Override
     public List<ClaimResponseDTO> getAllClaims() {
         return claimRepository.findAll().stream()
-                .map(claim -> modelMapper.map(claim, ClaimResponseDTO.class))
+                .map(this::mapToDTO)
                 .collect(Collectors.toList());
+    }
+
+    private ClaimResponseDTO mapToDTO(Claim claim) {
+        ClaimResponseDTO dto = new ClaimResponseDTO();
+        dto.setId(claim.getId());
+        dto.setClaimAmount(claim.getClaimAmount());
+        dto.setClaimDate(claim.getClaimDate());
+        dto.setDescription(claim.getDescription());
+        dto.setStatus(claim.getStatus().name());
+        if (claim.getCustomerPolicy() != null) {
+            dto.setCustomerPolicyId(claim.getCustomerPolicy().getId());
+        }
+        return dto;
     }
 }

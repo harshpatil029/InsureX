@@ -1,7 +1,6 @@
 package com.insurance.management.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.insurance.management.dto.ApiResponse;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -29,6 +28,10 @@ public class CustomJwtVerificationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
         try {
             String authHeader = request.getHeader("Authorization");
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
@@ -49,7 +52,7 @@ public class CustomJwtVerificationFilter extends OncePerRequestFilter {
             }
             filterChain.doFilter(request, response);
         } catch (Exception e) {
-            log.warn("Invalid JWT: {} - Proceeding without authentication", e.getMessage());
+            log.error("CRITICAL JWT FILTER ERROR: {}", e.getMessage());
             SecurityContextHolder.clearContext();
             filterChain.doFilter(request, response);
         }

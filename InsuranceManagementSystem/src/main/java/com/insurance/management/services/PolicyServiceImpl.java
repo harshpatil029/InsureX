@@ -25,9 +25,15 @@ public class PolicyServiceImpl implements PolicyService {
 
     @Override
     public PolicyResponseDTO createPolicy(CreatePolicyRequestDTO request) {
-        Policy policy = modelMapper.map(request, Policy.class);
-        Policy savedPolicy = policyRepository.save(policy);
-        return modelMapper.map(savedPolicy, PolicyResponseDTO.class);
+        try {
+            System.out.println("Creating Policy: " + request); // Log Request
+            Policy policy = modelMapper.map(request, Policy.class);
+            Policy savedPolicy = policyRepository.save(policy);
+            return modelMapper.map(savedPolicy, PolicyResponseDTO.class);
+        } catch (Exception e) {
+            e.printStackTrace(); // PRINT THE ERROR
+            throw new RuntimeException("Create Policy Failed: " + e.getMessage());
+        }
     }
 
     @Override

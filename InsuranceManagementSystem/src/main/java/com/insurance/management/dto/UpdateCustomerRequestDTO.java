@@ -10,4 +10,5 @@ public class UpdateCustomerRequestDTO {
     private String phone;
     private String address;
     private LocalDate dateOfBirth;
+    private Boolean deleted;
 }

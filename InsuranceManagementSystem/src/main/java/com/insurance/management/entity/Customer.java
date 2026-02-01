@@ -16,6 +16,9 @@ public class Customer {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Builder.Default
+    private boolean deleted = false;
+
     @Column(nullable = false)
     private String firstName;
 
