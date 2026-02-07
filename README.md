@@ -5,4 +5,4 @@ The backend is built using Java and Spring Boot, following RESTful architecture 
 
 Technology Stack :
 Backend : Java, Spring Boot, Spring Security & JWT, Hibernate / JPA, MySQL
-Frontend : React, Tailwind CSS
+Frontend : React, Bootstrap CSS
